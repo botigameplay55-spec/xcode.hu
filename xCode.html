@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="hu" id="htmlTag">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>xCode — Web Editor</title>
+  <style>
+    :root {
+      --accent: #2563eb;
+      --bg-dark: #1e293b;
+      --text-dark: #f1f5f9;
+      --bg-app: #f3f6fb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-app);
+    }
+
+    /* Fejléc és Vezérlők */
+    header {
+      padding: 12px 20px;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    h1 { margin: 0; font-size: 1.5rem; color: var(--accent); }
+
+    .controls { 
+      display: flex; 
+      gap: 8px; 
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .glassBtn, select.glassBtn {
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--accent);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .glassBtn:hover {
+      background: rgba(37, 99, 235, 0.2);
+      transform: translateY(-1px);
+    }
+
+    select.glassBtn { padding-right: 24px; appearance: auto; }
+
+    /* Fő elrendezés */
+    .app {
+      flex: 1;
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .editor-container, .preview-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    label { 
+      margin-bottom: 8px; 
+      font-weight: 600; 
+      font-size: 0.9rem; 
+      color: #475569; 
+    }
+
+    /* Kódszerkesztő */
+    textarea {
+      flex: 1;
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      background: var(--bg-dark);
+      color: var(--text-dark);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1rem;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Előnézet (Alapértelmezett: Asztali) */
+    .preview-wrapper {
+      flex: 1;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.08);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+      transition: all 0.3s ease;
+    }
+
+    /* Mobil Előnézet Mód */
+    .preview-wrapper.mobile-mode {
+      background: #cbd5e1; /* Szürke háttér a "telefon" mögött */
+    }
+
+    .preview-wrapper.mobile-mode iframe {
+      width: 375px;
+      height: 667px;
+      border: 12px solid #0f172a;
+      border-top-width: 40px;
+      border-bottom-width: 40px;
+      border-radius: 36px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      flex: none; /* Ne nyúljon meg */
+    }
+
+    @media (max-width: 850px) {
+      .app { flex-direction: column; overflow: auto; }
+      .editor-container, .preview-container { min-height: 400px; flex: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>xCode</h1>
+    <div class="controls">
+      <select id="langSelect" class="glassBtn">
+        <option value="hu">🇭🇺 HU</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      
+      <button id="mobileBtn" class="glassBtn" data-lang="mobileBtn">📱 Mobil nézet</button>
+      <button id="liveViewBtn" class="glassBtn" data-lang="liveBtn">👁️ Új ablak</button>
+      <button id="downloadBtn" class="glassBtn" data-lang="dlBtn">⬇ Letöltés</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <div class="editor-container">
+      <label for="codeEditor" data-lang="codeLabel">HTML / CSS / JS Kód:</label>
+      <textarea id="codeEditor" spellcheck="false">&lt;h1&gt;Szia Világ!&lt;/h1&gt;
+&lt;style&gt;
+  body { text-align: center; font-family: sans-serif; padding-top: 50px; }
+  h1 { color: #2563eb; }
+&lt;/style&gt;</textarea>
+    </div>
+
+    <div class="preview-container">
+      <label data-lang="previewLabel">Élő Előnézet:</label>
+      <div class="preview-wrapper" id="previewWrapper">
+        <iframe id="codePreview" title="Code Preview"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const editor = document.getElementById('codeEditor');
+      const preview = document.getElementById('codePreview');
+      const previewWrapper = document.getElementById('previewWrapper');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const mobileBtn = document.getElementById('mobileBtn');
+      const liveViewBtn = document.getElementById('liveViewBtn');
+      const langSelect = document.getElementById('langSelect');
+      const htmlTag = document.getElementById('htmlTag');
+
+      let isMobile = false;
+      let currentLang = 'hu';
+
+      // --- Szótár a többnyelvűséghez ---
+      const dict = {
+        hu: {
+          mobileBtn: "📱 Mobil nézet",
+          desktopBtn: "💻 Asztali nézet",
+          liveBtn: "👁️ Új ablak",
+          dlBtn: "⬇ Letöltés",
+          codeLabel: "HTML / CSS / JS Kód:",
+          previewLabel: "Élő Előnézet:",
+          emptyAlert: "Üres kódot nem tudsz letölteni!"
+        },
+        en: {
+          mobileBtn: "📱 Mobile View",
+          desktopBtn: "💻 Desktop View",
+          liveBtn: "👁️ New Window",
+          dlBtn: "⬇ Download",
+          codeLabel: "HTML / CSS / JS Code:",
+          previewLabel: "Live Preview:",
+          emptyAlert: "Cannot download empty code!"
+        }
+      };
+
+      // --- 1. Nyelv frissítése ---
+      function updateLanguage() {
+        const t = dict[currentLang];
+        document.querySelector('[data-lang="liveBtn"]').textContent = t.liveBtn;
+        document.querySelector('[data-lang="dlBtn"]').textContent = t.dlBtn;
+        document.querySelector('[data-lang="codeLabel"]').textContent = t.codeLabel;
+        document.querySelector('[data-lang="previewLabel"]').textContent = t.previewLabel;
+        
+        // A mobil gomb szövege függ az aktuális állapottól is
+        mobileBtn.textContent = isMobile ? t.desktopBtn : t.mobileBtn;
+        htmlTag.lang = currentLang;
+      }
+
+      langSelect.addEventListener('change', (e) => {
+        currentLang = e.target.value;
+        updateLanguage();
+      });
+
+      // --- 2. Élő előnézet (iFrame frissítés) ---
+      function updatePreview() {
+        preview.srcdoc = editor.value;
+      }
+      editor.addEventListener('input', updatePreview);
+
+      // --- 3. Mobil nézet kapcsoló ---
+      mobileBtn.addEventListener('click', () => {
+        isMobile = !isMobile;
+        previewWrapper.classList.toggle('mobile-mode', isMobile);
+        updateLanguage(); // Gomb szövegének frissítése
+      });
+
+      // --- 4. Külön Élő Nézet (Új ablak) ---
+      liveViewBtn.addEventListener('click', () => {
+        // Nyit egy új üres lapot és beleírja a kódot
+        const newWindow = window.open();
+        newWindow.document.open();
+        newWindow.document.write(editor.value);
+        newWindow.document.close();
+      });
+
+      // --- 5. Fájl letöltése ---
+      downloadBtn.addEventListener('click', () => {
+        const code = editor.value;
+        if (!code.trim()) {
+          alert(dict[currentLang].emptyAlert);
+          return;
+        }
+        const blob = new Blob([code], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Init
+      updatePreview();
+    });
+  </script>
+</body>
+</html>
